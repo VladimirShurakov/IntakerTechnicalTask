@@ -1,0 +1,8 @@
+@TaskManagement.API_HostAddress = http://localhost:5074
+
+GET {{TaskManagement.API_HostAddress}}/tasks/
+Accept: application/json
+
+POST {{TaskManagement.API_HostAddress}}/tasks/
+Accept: application/json
+###
