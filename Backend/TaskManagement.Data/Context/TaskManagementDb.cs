@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using TaskStatus = TaskManagement.Data.Models.TaskStatus;
-using Task = TaskManagement.Data.Models.Task;
+using TaskStatus = TaskManagement.Data.Entities.TaskStatus;
+using Task = TaskManagement.Data.Entities.Task;
 
 
 namespace TaskManagement.Data.Context;

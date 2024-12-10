@@ -1,8 +1,30 @@
-@TaskManagement.API_HostAddress = http://localhost:5074
-
-GET {{TaskManagement.API_HostAddress}}/tasks/
+GET {{HostAddress}}/tasks/
 Accept: application/json
 
-POST {{TaskManagement.API_HostAddress}}/tasks/
+###
+
+GET {{HostAddress}}/taskStatuses/
 Accept: application/json
+
+###
+
+POST {{HostAddress}}/tasks/
+Accept: application/json
+Content-Type: application/json
+
+{
+  "name": "task #1",
+  "description": "Second task",
+  "assignedTo": "Vova"
+}
+
+###
+
+PUT {{HostAddress}}/tasks/{id}
+Content-Type: application/json
+
+{
+  "statusId": 1
+}
+
 ###

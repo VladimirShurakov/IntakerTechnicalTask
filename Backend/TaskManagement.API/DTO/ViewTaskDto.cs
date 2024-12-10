@@ -1,46 +1,33 @@
-﻿using TaskManagement.Data.Models;
-using Task = TaskManagement.Data.Models.Task;
+﻿using Task = TaskManagement.Data.Entities.Task;
 
 namespace TaskManagement.API.DTO;
 /// <summary>
 /// View Task DTO
 /// </summary>
-public class ViewTaskDto
+public class ViewTaskDto(Task task)
 {
-    /// <summary>
-    /// Default CTOR
-    /// </summary>
-    public ViewTaskDto() { }
-
-    /// <summary>
-    /// To create a View DTO from DB model
-    /// </summary>
-    /// <param name="task">DB instance of Task</param>
-    public ViewTaskDto(Task task) => (Id, Name, Description, Status, AssignedTo) =
-        (task.Id, task.Name, task.Description, task.Status.Name, task.AssignedTo);
-
     /// <summary>
     /// Task Identifier
     /// </summary>
-    public int Id { get; set; }
+    public int Id { get; } = task.Id;
     
     /// <summary>
     /// The name of the task
     /// </summary>
-    public string Name { get; set; }
+    public string Name { get; } = task.Name;
     
     /// <summary>
     /// Task description
     /// </summary>
-    public string Description { get; set; }
+    public string Description { get; } = task.Description;
     
     /// <summary>
     /// Current task status
     /// </summary>
-    public string Status { get; set; }
+    public string Status { get; } = task.Status.Name;
     
     /// <summary>
     /// Task assignee
     /// </summary>
-    public string? AssignedTo { get; set; }
+    public string? AssignedTo { get; } = task.AssignedTo;
 }
