@@ -2,11 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using TaskManagement.API.DTO;
 using TaskManagement.Data;
 using TaskManagement.Data.Context;
-using Task = TaskManagement.Data.Entities.Task;
-using TaskStatus = TaskManagement.Data.Entities.TaskStatus;
+using TaskManagement.Data.Entities;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddDbContext<TaskManagementDb>(opt => opt.UseInMemoryDatabase("TaskManagementDb"));
+builder.Services.AddDbContext<TaskManagementDb>(opt => opt.UseSqlServer("TaskManagementDb"));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 var app = builder.Build();
 
@@ -32,7 +31,7 @@ app.Run();
 static async Task<IResult> GetAllAsync(TaskManagementDb db, CancellationToken cancellationToken)
 {
     return TypedResults.Ok(await db.Tasks
-        .Include(i => i.Status)
+        .Include(i => i.ProjectTaskStatus)
         .OrderBy(x => x.Name)
         .Select(x => new ViewTaskDto(x))
         .ToListAsync(cancellationToken));
@@ -49,11 +48,11 @@ static async Task<IResult> GetAllStatusesAsync(TaskManagementDb db, Cancellation
 static async Task<IResult> CreateAsync(CreateTaskDto createTaskDto, TaskManagementDb db,
     CancellationToken cancellationToken)
 {
-    var task = new Task
+    var task = new ProjectTask
     {
         Name = createTaskDto.Name,
         Description = createTaskDto.Description,
-        Status = new TaskStatus {Id = 1, Name = "Not Started"},
+        ProjectTaskStatus = new ProjectTaskStatus {Id = 1, Name = "Not Started"},
         AssignedTo = createTaskDto.AssignedTo
     };
     db.Tasks.Add(task);

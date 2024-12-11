@@ -1,10 +1,10 @@
-﻿using Task = TaskManagement.Data.Entities.Task;
+﻿using TaskManagement.Data.Entities;
 
 namespace TaskManagement.API.DTO;
 /// <summary>
 /// View Task DTO
 /// </summary>
-public class ViewTaskDto(Task task)
+public class ViewTaskDto(ProjectTask task)
 {
     /// <summary>
     /// Task Identifier
@@ -24,7 +24,7 @@ public class ViewTaskDto(Task task)
     /// <summary>
     /// Current task status
     /// </summary>
-    public string Status { get; } = task.Status.Name;
+    public string Status { get; } = task.ProjectTaskStatus.Name;
     
     /// <summary>
     /// Task assignee

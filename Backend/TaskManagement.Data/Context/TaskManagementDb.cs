@@ -1,12 +1,14 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using TaskStatus = TaskManagement.Data.Entities.TaskStatus;
-using Task = TaskManagement.Data.Entities.Task;
-
+using TaskManagement.Data.Entities;
 
 namespace TaskManagement.Data.Context;
 
 public class TaskManagementDb(DbContextOptions<TaskManagementDb> options) : DbContext(options)
 {
-    public DbSet<Task> Tasks { get; set; }
-    public DbSet<TaskStatus> TaskStatuses { get; set; }
+    public DbSet<ProjectTask> Tasks { get; set; }
+    public DbSet<ProjectTaskStatus> TaskStatuses { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder options)
+    {
+    }
 }
