@@ -2,7 +2,7 @@ using Azure.Identity;
 using Azure.Messaging.ServiceBus;
 using Infrastructure;
 using Infrastructure.Messages;
-using Infrastructure.ServiceBusHandler;
+using Infrastructure.ServiceBus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.Configuration;
@@ -12,56 +12,54 @@ using TaskManagement.API.Options;
 using TaskManagement.Data;
 using TaskManagement.Data.Context;
 
-
+// Minimal WebAPI style
 var builder = WebApplication.CreateBuilder(args);
-var configuration = builder.Configuration;
-// EF Configuration
-var connectionString = configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddDbContext<TaskManagementDb>(opt => opt.UseSqlServer(connectionString));
-builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
-// Service Bus Configuration
-var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-builder.Services.Configure<ServiceBusOptions>(builder.Configuration.GetSection(nameof(ServiceBusOptions)));
-var serviceBusOptions = configuration.GetSection("ServiceBusOptions").Get<ServiceBusOptions>() ??
-                        throw new InvalidOperationException($"Missing {nameof(ServiceBusOptions)} configuration.");
-var clientOptions = new ServiceBusClientOptions
-{
-    TransportType = ServiceBusTransportType.AmqpTcp,
-    RetryOptions = new ServiceBusRetryOptions
-    {
-        MaxRetries = serviceBusOptions.RetryCount,
-        Delay = TimeSpan.FromMilliseconds(serviceBusOptions.RetryDelayMs)
-    }
-};
-if (environment != null && environment.Equals("Development", StringComparison.OrdinalIgnoreCase))
-{
-    builder.Services.AddSingleton(_ => new ServiceBusClient(serviceBusOptions.ConnectionOrFqdn, clientOptions));
-}
-else
-{
-    builder.Services.AddSingleton(_ =>
-        new ServiceBusClient(serviceBusOptions.ConnectionOrFqdn, new DefaultAzureCredential(), clientOptions));
-}
-
-builder.Services.AddSingleton<IMessageBrokerHandler, ServiceBusHandler>();
-builder.Services.AddScoped(typeof(BrokeredMessageBuilder<>));
+Configure(builder);
 var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
 
 // Defining task group actions
 var taskActions = app.MapGroup("/tasks");
 taskActions.MapGet("/", GetAllAsync);
 taskActions.MapPost("/", CreateAsync);
-taskActions.MapPut("/{id}", UpdateAsync);
+taskActions.MapPut("/{id:int}", UpdateAsync);
 // Defining a get task statuses action
 app.MapGet("/taskStatuses", GetAllStatusesAsync);
 app.Run();
+
+static void Configure(WebApplicationBuilder builder)
+{
+    var configuration = builder.Configuration;
+    // EF Configuration
+    var connectionString = configuration.GetConnectionString("DefaultConnection");
+    builder.Services.AddDbContext<TaskManagementDb>(opt => opt.UseSqlServer(connectionString));
+    builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+
+    // Service Bus Configuration
+    var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+    builder.Services.Configure<ServiceBusOptions>(builder.Configuration.GetSection(nameof(ServiceBusOptions)));
+    var serviceBusOptions = configuration.GetSection("ServiceBusOptions").Get<ServiceBusOptions>() ??
+                            throw new InvalidOperationException($"Missing {nameof(ServiceBusOptions)} configuration.");
+    var clientOptions = new ServiceBusClientOptions
+    {
+        TransportType = ServiceBusTransportType.AmqpTcp,
+        RetryOptions = new ServiceBusRetryOptions
+        {
+            MaxRetries = serviceBusOptions.RetryCount,
+            Delay = TimeSpan.FromMilliseconds(serviceBusOptions.RetryDelayMs)
+        }
+    };
+    if (environment != null && environment.Equals("Development", StringComparison.OrdinalIgnoreCase))
+    {
+        builder.Services.AddSingleton(_ => new ServiceBusClient(serviceBusOptions.ConnectionOrFqdn, clientOptions));
+    }
+    else
+    {
+        builder.Services.AddSingleton(_ =>
+            new ServiceBusClient(serviceBusOptions.ConnectionOrFqdn, new DefaultAzureCredential(), clientOptions));
+    }
+    builder.Services.AddSingleton<IMessageSender, ServiceBusMessageSender>();
+    builder.Services.AddScoped(typeof(BrokeredMessageBuilder<>));
+}
 
 static async Task<IResult> GetAllAsync(TaskManagementDb db, CancellationToken cancellationToken)
 {
@@ -94,7 +92,7 @@ static async Task<IResult> CreateAsync(CreateTaskDto createTaskDto, TaskManageme
 }
 
 static async Task<IResult> UpdateAsync(int id, UpdateTaskDto updateTaskDto, TaskManagementDb db,
-    IOptions<ServiceBusOptions> serviceBusOptions, IMessageBrokerHandler serviceBusHandler,
+    IOptions<ServiceBusOptions> serviceBusOptions, IMessageSender serviceBusHandler,
     BrokeredMessageBuilder<TaskCompletedMessage> builder, CancellationToken cancellationToken)
 {
     // Checking if a status with such ID exists

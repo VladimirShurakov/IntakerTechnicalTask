@@ -1,5 +1,9 @@
 ﻿namespace Infrastructure;
 
+/// <summary>
+/// Interface for brokered message instance
+/// </summary>
+/// <typeparam name="TMessage">Type of the message payload</typeparam>
 public interface IBrokeredMessage<out TMessage>
 {
     TMessage Body { get; }

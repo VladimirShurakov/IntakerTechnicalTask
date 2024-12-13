@@ -1,5 +1,9 @@
 ﻿namespace Infrastructure;
 
+/// <summary>
+/// To partially build a brokered message 
+/// </summary>
+/// <typeparam name="TBody">Type of the brokered message payload</typeparam>
 public sealed class BrokeredMessageBuilder<TBody>
 {
     private TBody? _body;
