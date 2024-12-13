@@ -27,7 +27,7 @@ var serviceBusOptions = configuration.GetSection("ServiceBusOptions").Get<Servic
                         throw new InvalidOperationException($"Missing {nameof(ServiceBusOptions)} configuration.");
 var clientOptions = new ServiceBusClientOptions
 {
-    TransportType = ServiceBusTransportType.AmqpWebSockets,
+    TransportType = ServiceBusTransportType.AmqpTcp,
     RetryOptions = new ServiceBusRetryOptions
     {
         MaxRetries = serviceBusOptions.RetryCount,
