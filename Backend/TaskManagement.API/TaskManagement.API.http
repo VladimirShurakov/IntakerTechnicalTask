@@ -1,0 +1,30 @@
+GET {{HostAddress}}/tasks/
+Accept: application/json
+
+###
+
+GET {{HostAddress}}/taskStatuses/
+Accept: application/json
+
+###
+
+POST {{HostAddress}}/tasks/
+Accept: application/json
+Content-Type: application/json
+
+{
+  "name": "task #1",
+  "description": "Second task",
+  "assignedTo": "Vova"
+}
+
+###
+
+PUT {{HostAddress}}/tasks/{id}
+Content-Type: application/json
+
+{
+  "statusId": 1
+}
+
+###
