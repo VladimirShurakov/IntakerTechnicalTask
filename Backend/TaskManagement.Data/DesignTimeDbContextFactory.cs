@@ -34,7 +34,7 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<TaskManage
         var connectionString = configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrEmpty(connectionString))
         {
-            throw new InvalidOperationException("No connection string found in appsettings.json");
+            throw new InvalidOperationException("No connection string found in appsettings.local.json");
         }
 
         builder.UseSqlServer(connectionString);

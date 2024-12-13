@@ -1,12 +1,51 @@
+using Azure.Identity;
+using Azure.Messaging.ServiceBus;
+using Infrastructure;
+using Infrastructure.Messages;
+using Infrastructure.ServiceBusHandler;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.Configuration;
 using TaskManagement.API.DTO;
+using TaskManagement.API.Extensions;
+using TaskManagement.API.Options;
 using TaskManagement.Data;
 using TaskManagement.Data.Context;
-using TaskManagement.Data.Entities;
+
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddDbContext<TaskManagementDb>(opt => opt.UseSqlServer("TaskManagementDb"));
+var configuration = builder.Configuration;
+// EF Configuration
+var connectionString = configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<TaskManagementDb>(opt => opt.UseSqlServer(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+
+// Service Bus Configuration
+var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+builder.Services.Configure<ServiceBusOptions>(builder.Configuration.GetSection(nameof(ServiceBusOptions)));
+var serviceBusOptions = configuration.GetSection("ServiceBusOptions").Get<ServiceBusOptions>() ??
+                        throw new InvalidOperationException($"Missing {nameof(ServiceBusOptions)} configuration.");
+var clientOptions = new ServiceBusClientOptions
+{
+    TransportType = ServiceBusTransportType.AmqpWebSockets,
+    RetryOptions = new ServiceBusRetryOptions
+    {
+        MaxRetries = serviceBusOptions.RetryCount,
+        Delay = TimeSpan.FromMilliseconds(serviceBusOptions.RetryDelayMs)
+    }
+};
+if (environment != null && environment.Equals("Development", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton(_ => new ServiceBusClient(serviceBusOptions.ConnectionOrFqdn, clientOptions));
+}
+else
+{
+    builder.Services.AddSingleton(_ =>
+        new ServiceBusClient(serviceBusOptions.ConnectionOrFqdn, new DefaultAzureCredential(), clientOptions));
+}
+
+builder.Services.AddSingleton<IMessageBrokerHandler, ServiceBusHandler>();
+builder.Services.AddScoped(typeof(BrokeredMessageBuilder<>));
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -15,17 +54,13 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-//app.UseHttpsRedirection();
-
 // Defining task group actions
 var taskActions = app.MapGroup("/tasks");
 taskActions.MapGet("/", GetAllAsync);
 taskActions.MapPost("/", CreateAsync);
 taskActions.MapPut("/{id}", UpdateAsync);
-
 // Defining a get task statuses action
 app.MapGet("/taskStatuses", GetAllStatusesAsync);
-
 app.Run();
 
 static async Task<IResult> GetAllAsync(TaskManagementDb db, CancellationToken cancellationToken)
@@ -48,13 +83,10 @@ static async Task<IResult> GetAllStatusesAsync(TaskManagementDb db, Cancellation
 static async Task<IResult> CreateAsync(CreateTaskDto createTaskDto, TaskManagementDb db,
     CancellationToken cancellationToken)
 {
-    var task = new ProjectTask
-    {
-        Name = createTaskDto.Name,
-        Description = createTaskDto.Description,
-        ProjectTaskStatus = new ProjectTaskStatus {Id = 1, Name = "Not Started"},
-        AssignedTo = createTaskDto.AssignedTo
-    };
+    var notStartedTask = await db.TaskStatuses.FindAsync(Constants.TaskStatusId.NotStarted, cancellationToken);
+    if (notStartedTask == null) return TypedResults.BadRequest("Default task status was not found");
+
+    var task = createTaskDto.ToEntity(notStartedTask.Id);
     db.Tasks.Add(task);
     await db.SaveChangesAsync(cancellationToken);
     var viewTaskDto = new ViewTaskDto(task);
@@ -62,7 +94,8 @@ static async Task<IResult> CreateAsync(CreateTaskDto createTaskDto, TaskManageme
 }
 
 static async Task<IResult> UpdateAsync(int id, UpdateTaskDto updateTaskDto, TaskManagementDb db,
-    CancellationToken cancellationToken)
+    IOptions<ServiceBusOptions> serviceBusOptions, IMessageBrokerHandler serviceBusHandler,
+    BrokeredMessageBuilder<TaskCompletedMessage> builder, CancellationToken cancellationToken)
 {
     // Checking if a status with such ID exists
     var status = await db.TaskStatuses.FindAsync(updateTaskDto.StatusId, cancellationToken);
@@ -73,10 +106,18 @@ static async Task<IResult> UpdateAsync(int id, UpdateTaskDto updateTaskDto, Task
     // Update the status
     task.StatusId = updateTaskDto.StatusId;
     var updatedCount = await db.SaveChangesAsync(cancellationToken);
-    // If status has been updated and task is Completed - send message
+    // If status has been updated and task is Completed - send the message
     if (updatedCount == 1 && status.Name.Equals(Constants.TaskStatusName.Completed))
     {
-        //TODO: add ServiceBusHandler
+        var taskCompletedMessage = new TaskCompletedMessage {TaskId = task.Id, CompletionDate = DateTime.UtcNow};
+        var serviceBusMessage = builder.AddBody(taskCompletedMessage)
+            .AddTimeToLive(TimeSpan.FromHours(serviceBusOptions.Value.MessageTimeToLiveDays))
+            .Build();
+        // TODO: I'd better implemented Transactional outbox pattern to avoid any compensatory actions in case of
+        // message sending failure
+        await serviceBusHandler.SendMessageAsync(serviceBusOptions.Value.QueueOrTopicName, serviceBusMessage,
+            cancellationToken);
     }
+
     return TypedResults.NoContent();
 }

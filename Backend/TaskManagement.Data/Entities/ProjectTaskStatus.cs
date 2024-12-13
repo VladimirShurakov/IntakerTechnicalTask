@@ -5,14 +5,14 @@ namespace TaskManagement.Data.Entities;
 
 public class ProjectTaskStatus
 {
-    [Key]
-    public required int Id { get; set; }
+    [Key, DatabaseGenerated(DatabaseGeneratedOption.None)]
+    public required int Id { get; init; }
     
     [Required]
     [MaxLength(50)]
-    public required string Name { get; set; }
+    public required string Name { get; init; }
 
     // Navigation properties
     [InverseProperty("ProjectTaskStatus")]
-    public required ICollection<ProjectTask> ProjectTasks { get; init; } = new List<ProjectTask>();
+    public ICollection<ProjectTask> ProjectTasks { get; init; } = new List<ProjectTask>();
 }

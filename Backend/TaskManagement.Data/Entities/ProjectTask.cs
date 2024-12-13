@@ -5,7 +5,9 @@ namespace TaskManagement.Data.Entities;
 
 public class ProjectTask
 {
-    [Key, DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    private readonly ProjectTaskStatus? _projectTaskStatus;
+
+    [Key]
     public int Id { get; init; }
     
     [Required, MaxLength(50)]
@@ -21,5 +23,10 @@ public class ProjectTask
     public required int StatusId { get; set; }
     
     // Navigation properties
-    public required ProjectTaskStatus ProjectTaskStatus { get; init; }
+    public ProjectTaskStatus ProjectTaskStatus
+    {
+        init => _projectTaskStatus = value;
+        get => _projectTaskStatus
+               ?? throw new InvalidOperationException("Uninitialized property: " + nameof(ProjectTaskStatus));
+    }
 }
